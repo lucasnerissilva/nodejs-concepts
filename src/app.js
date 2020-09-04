@@ -10,21 +10,10 @@ app.use(cors());
 
 const repositories = [];
 
-const buildResponse = (response, status) => {
-  return response.status(status).send();
-};
-
-const buildResponseWithError = (response, status, message) => {
-  if (message)
-    return response.status(status).send({
-      error: message,
-    });
-
-  return response.status(status).send();
-};
-
-const buildResponseWithReturn = (response, status, apiReturn) => {
-  return response.status(status).send(apiReturn);
+const buildResponseWithBadRequestStatus = (response, message) => {
+  return response.status(400).send({
+    error: message,
+  });
 };
 
 const checkUUID = () => {
@@ -32,7 +21,7 @@ const checkUUID = () => {
     const { id } = req.params;
 
     if (!isUuid(id))
-      return buildResponseWithError(res, 400, "invalid UUID type");
+      return buildResponseWithBadRequestStatus(res, "invalid UUID type");
 
     return next();
   };
@@ -42,12 +31,13 @@ const checkRepositoryPayload = () => {
   return (req, res, next) => {
     const { title, url, techs } = req.body;
 
-    if (!title) return buildResponseWithError(res, 400, "title is required");
+    if (!title)
+      return buildResponseWithBadRequestStatus(res, "title is required");
 
-    if (!url) return buildResponseWithError(res, 400, "url is required");
+    if (!url) return buildResponseWithBadRequestStatus(res, "url is required");
 
     if (!techs || !techs.length)
-      return buildResponseWithError(res, 400, "techs is required");
+      return buildResponseWithBadRequestStatus(res, "techs is required");
 
     return next();
   };
@@ -56,9 +46,9 @@ const checkRepositoryPayload = () => {
 app.get("/repositories", (request, response) => {
   // TODO
   if (repositories && repositories.length)
-    return buildResponseWithReturn(response, 200, repositories);
+    return response.status(200).send(repositories);
 
-  return buildResponse(response, 204);
+  return response.status(204).send();
 });
 
 app.post("/repositories", checkRepositoryPayload(), (request, response) => {
@@ -68,11 +58,25 @@ app.post("/repositories", checkRepositoryPayload(), (request, response) => {
 
   repositories.push(repository);
 
-  return buildResponseWithReturn(response, 201, repository);
+  return response.status(201).send(repository);
 });
 
 app.put("/repositories/:id", checkUUID(), (request, response) => {
   // TODO
+  const { id } = request.params;
+
+  const { title, url, techs } = request.body;
+
+  const repository = repositories.find((r) => r.id === id);
+
+  if (!repository)
+    return buildResponseWithBadRequestStatus(response, "repository not found");
+
+  if (title) repository.title = title;
+  if (url) repository.url = url;
+  if (techs) repository.techs = techs;
+
+  return response.status(200).send(repository);
 });
 
 app.delete("/repositories/:id", checkUUID(), (request, response) => {
@@ -82,17 +86,27 @@ app.delete("/repositories/:id", checkUUID(), (request, response) => {
   let repository = repositories.find((r) => r.id === id);
 
   if (!repository)
-    return buildResponseWithError(response, 400, "repository not found");
+    return buildResponseWithBadRequestStatus(res, "repository not found");
 
   const index = repositories.indexOf(repository);
 
   repositories.splice(index, 1);
 
-  return buildResponse(response, 204);
+  return response.status(204).send();
 });
 
 app.post("/repositories/:id/like", checkUUID(), (request, response) => {
   // TODO
+  const { id } = request.params;
+
+  let repository = repositories.find((r) => r.id === id);
+
+  if (!repository)
+    return buildResponseWithBadRequestStatus(res, "repository not found");
+
+  repository.likes++;
+
+  return response.status(201).send(repository);
 });
 
 module.exports = app;
